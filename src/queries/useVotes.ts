@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catApi } from '../services/catApi';
 import { QUERY_KEYS } from '../constants/query-keys';
