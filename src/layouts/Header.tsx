@@ -1,14 +1,7 @@
 import React, { memo } from 'react';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { DarkModeToggle } from '../components/ui/DarkModeToggle';
-import { useRefreshImages } from '../queries/useImages';
 
 export const Header: React.FC = memo(() => {
-  const refreshImagesMutation = useRefreshImages();
-
-  const handleRefresh = () => {
-    refreshImagesMutation.mutate(10);
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg shadow-sm border-b border-gray-200/50 dark:border-gray-700/50">
@@ -31,16 +24,6 @@ export const Header: React.FC = memo(() => {
           
           <div className="flex items-center space-x-3">
             <DarkModeToggle />
-            <button
-              onClick={handleRefresh}
-              disabled={refreshImagesMutation.isPending}
-              className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-xl shadow-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 active:scale-95"
-            >
-              <ArrowPathIcon 
-                className={`-ml-1 mr-2 h-5 w-5 ${refreshImagesMutation.isPending ? 'animate-spin' : ''}`} 
-              />
-              {refreshImagesMutation.isPending ? 'Loading...' : 'Refresh Cats'}
-            </button>
           </div>
         </div>
       </div>

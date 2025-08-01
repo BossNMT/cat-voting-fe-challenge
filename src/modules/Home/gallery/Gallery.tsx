@@ -1,11 +1,17 @@
 import React, { memo } from 'react';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { MasonryCatImageCard } from './MasonryCatImageCard';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { MasonryGrid } from '../../../components/ui/MasonryGrid';
-import { useImages } from '../../../queries/useImages';
+import { useImages, useRefreshImages } from '../../../queries/useImages';
 
 export const Gallery: React.FC = memo(() => {
   const { data: images = [], isLoading, error, isRefetching } = useImages();
+  const refreshImagesMutation = useRefreshImages();
+
+  const handleRefresh = () => {
+    refreshImagesMutation.mutate(10);
+  };
 
   if (isLoading && images.length === 0) {
     return (
@@ -50,6 +56,20 @@ export const Gallery: React.FC = memo(() => {
 
   return (
     <div className="space-y-4">
+      {/* Refresh Button */}
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={handleRefresh}
+          disabled={refreshImagesMutation.isPending}
+          className="inline-flex items-center px-6 py-3 text-sm font-semibold rounded-xl shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 active:scale-95"
+        >
+          <ArrowPathIcon 
+            className={`-ml-1 mr-2 h-5 w-5 ${refreshImagesMutation.isPending ? 'animate-spin' : ''}`} 
+          />
+          {refreshImagesMutation.isPending ? 'Loading...' : 'Refresh Cats'}
+        </button>
+      </div>
+
       {/* Refetching indicator */}
       {isRefetching && (
         <div className="flex items-center justify-center py-2 text-blue-600 dark:text-blue-400">
