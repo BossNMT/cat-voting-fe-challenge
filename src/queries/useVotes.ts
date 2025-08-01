@@ -18,7 +18,7 @@ export const useCreateVote = () => {
   const queryClient = useQueryClient();
   const subId = subIdUtils.getSubId();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (voteData: Omit<CreateVoteRequest, 'sub_id'>) =>
       catApi.createVote({ ...voteData, sub_id: subId }),
     
@@ -43,8 +43,8 @@ export const useCreateVote = () => {
         (old = []) => [...old, optimisticVote]
       );
 
-      // Return a context object with the snapshotted value
-      return { previousVotes, optimisticVote };
+      // Return a context object with the snapshotted value and vote data for retry
+      return { previousVotes, optimisticVote, voteData };
     },
 
     onError: (_, __, context) => {
@@ -77,6 +77,21 @@ export const useCreateVote = () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USER_VOTES(subId) });
     },
   });
+
+  // Enhanced mutation with retry functionality
+  return {
+    ...mutation,
+    retryVote: (imageId: string, value: 1 | -1) => {
+      return mutation.mutate({ image_id: imageId, value });
+    },
+    getLastFailedVote: (imageId: string) => {
+      const context = mutation.context as any;
+      if (mutation.isError && context?.voteData?.image_id === imageId) {
+        return context.voteData;
+      }
+      return null;
+    }
+  };
 };
 
 // Helper hook to check if user has voted on a specific image
@@ -89,5 +104,40 @@ export const useHasVoted = (imageId: string, subId?: string) => {
   return {
     hasVoted: !!vote,
     vote,
+  };
+};
+
+// Enhanced hook for optimistic voting with retry functionality
+export const useOptimisticVoting = (imageId: string) => {
+  const { hasVoted, vote: userVote } = useHasVoted(imageId);
+  const createVoteMutation = useCreateVote();
+  
+  const vote = async (value: 1 | -1) => {
+    if (hasVoted) return;
+    
+    await createVoteMutation.mutateAsync({
+      image_id: imageId,
+      value,
+    });
+  };
+  
+  const retry = () => {
+    const lastFailedVote = createVoteMutation.getLastFailedVote(imageId);
+    if (lastFailedVote) {
+      createVoteMutation.retryVote(imageId, lastFailedVote.value);
+    }
+  };
+  
+  const hasError = createVoteMutation.isError && 
+                   (createVoteMutation.context as any)?.voteData?.image_id === imageId;
+  
+  return {
+    vote,
+    retry,
+    hasVoted,
+    userVote,
+    isError: hasError,
+    isPending: createVoteMutation.isPending,
+    error: hasError ? createVoteMutation.error : null,
   };
 };

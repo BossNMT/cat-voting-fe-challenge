@@ -1,8 +1,7 @@
 import React, { memo, useState, useCallback } from 'react';
 import { VotingButton } from '../voting/VotingButton';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
-import { useCreateVote, useHasVoted } from '../../../queries/useVotes';
-import { useUIStore } from '../../../store/uiStore';
+import { useOptimisticVoting } from '../../../queries/useVotes';
 import type { CatImage } from '../../../types/cat.types';
 
 interface CatImageCardProps {
@@ -13,26 +12,24 @@ export const CatImageCard: React.FC<CatImageCardProps> = memo(({ image }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   
-  const { hasVoted, vote: userVote } = useHasVoted(image.id);
-  const createVoteMutation = useCreateVote();
-  const { isVoting, setVoting } = useUIStore();
-  
-  const isCurrentlyVoting = isVoting[image.id] || createVoteMutation.isPending;
+  const {
+    vote,
+    retry,
+    hasVoted,
+    userVote,
+    isError,
+  } = useOptimisticVoting(image.id);
   
   const handleVote = useCallback(async (value: 1 | -1) => {
-    if (hasVoted || isCurrentlyVoting) return;
-    
-    setVoting(image.id, true);
+    if (hasVoted && !isError) return;
     
     try {
-      await createVoteMutation.mutateAsync({
-        image_id: image.id,
-        value,
-      });
-    } finally {
-      setVoting(image.id, false);
+      await vote(value);
+    } catch (error) {
+      // Error handling is done by the optimistic voting hook
+      console.error('Vote failed:', error);
     }
-  }, [hasVoted, isCurrentlyVoting, setVoting, image.id, createVoteMutation]);
+  }, [hasVoted, isError, vote]);
 
   const handleImageLoad = useCallback(() => {
     setImageLoading(false);
@@ -79,22 +76,24 @@ export const CatImageCard: React.FC<CatImageCardProps> = memo(({ image }) => {
         <div className="flex gap-3 mb-3">
           <VotingButton
             type="up"
-            isVoted={hasVoted}
+            isVoted={hasVoted && !isError}
             isCurrentVote={userVote?.value === 1}
             onClick={() => handleVote(1)}
-            disabled={isCurrentlyVoting}
+            hasError={isError && userVote?.value === 1}
+            onRetry={retry}
           />
           <VotingButton
             type="down"
-            isVoted={hasVoted}
+            isVoted={hasVoted && !isError}
             isCurrentVote={userVote?.value === -1}
             onClick={() => handleVote(-1)}
-            disabled={isCurrentlyVoting}
+            hasError={isError && userVote?.value === -1}
+            onRetry={retry}
           />
         </div>
 
         {/* Vote Status */}
-        {hasVoted && userVote && (
+        {hasVoted && userVote && !isError && (
           <div className="text-center">
             <div className={`text-sm font-medium ${
               userVote.value === 1 ? 'text-green-600' : 'text-red-600'
@@ -105,11 +104,12 @@ export const CatImageCard: React.FC<CatImageCardProps> = memo(({ image }) => {
           </div>
         )}
 
-        {/* Loading State */}
-        {isCurrentlyVoting && (
-          <div className="flex items-center justify-center">
-            <LoadingSpinner size="sm" />
-            <span className="ml-2 text-sm text-gray-600">Processing vote...</span>
+        {/* Error Status */}
+        {isError && (
+          <div className="text-center">
+            <div className="text-sm font-medium text-red-600">
+              Vote failed. Click retry to try again.
+            </div>
           </div>
         )}
       </div>

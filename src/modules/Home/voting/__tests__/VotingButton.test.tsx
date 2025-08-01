@@ -9,6 +9,8 @@ describe('VotingButton', () => {
     isCurrentVote: false,
     onClick: vi.fn(),
     disabled: false,
+    hasError: false,
+    onRetry: vi.fn(),
   };
 
   beforeEach(() => {
@@ -57,11 +59,18 @@ describe('VotingButton', () => {
       expect(button).toBeEnabled();
     });
 
-    it('should be disabled when isVoted is true', () => {
-      render(<VotingButton {...defaultProps} isVoted={true} />);
+    it('should be disabled when isVoted is true and no error', () => {
+      render(<VotingButton {...defaultProps} isVoted={true} hasError={false} />);
       
       const button = screen.getByRole('button');
       expect(button).toBeDisabled();
+    });
+
+    it('should be enabled when isVoted is true but has error', () => {
+      render(<VotingButton {...defaultProps} isVoted={true} hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      expect(button).toBeEnabled();
     });
 
     it('should be disabled when disabled prop is true', () => {
@@ -101,11 +110,18 @@ describe('VotingButton', () => {
       expect(button).toHaveClass('bg-gray-100', 'text-gray-500', 'border-gray-200');
     });
 
-    it('should apply disabled styles when isVoted is true', () => {
-      render(<VotingButton {...defaultProps} isVoted={true} />);
+    it('should apply disabled styles when isVoted is true and no error', () => {
+      render(<VotingButton {...defaultProps} isVoted={true} hasError={false} />);
       
       const button = screen.getByRole('button');
       expect(button).toHaveClass('bg-gray-100', 'text-gray-500', 'border-gray-200');
+    });
+
+    it('should apply error styles when hasError is true', () => {
+      render(<VotingButton {...defaultProps} hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass('bg-red-100', 'text-red-700', 'border-red-300');
     });
 
     it('should apply default up vote styles when not voted and enabled', () => {
@@ -144,9 +160,9 @@ describe('VotingButton', () => {
       expect(mockOnClick).not.toHaveBeenCalled();
     });
 
-    it('should not call onClick when isVoted is true', () => {
+    it('should not call onClick when isVoted is true and no error', () => {
       const mockOnClick = vi.fn();
-      render(<VotingButton {...defaultProps} onClick={mockOnClick} isVoted={true} />);
+      render(<VotingButton {...defaultProps} onClick={mockOnClick} isVoted={true} hasError={false} />);
       
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -291,6 +307,169 @@ describe('VotingButton', () => {
       // Based on the actual implementation, isCurrentVote takes precedence
       expect(button).toHaveClass('bg-green-100', 'text-green-700');
       expect(button).not.toHaveClass('bg-gray-100', 'text-gray-500');
+    });
+  });
+
+  describe('Error State', () => {
+    it('should display "Retry" text when hasError is true', () => {
+      render(<VotingButton {...defaultProps} hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveTextContent('Retry');
+    });
+
+    it('should have correct aria-label for retry up vote', () => {
+      render(<VotingButton {...defaultProps} type="up" hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('aria-label', 'Retry vote up');
+    });
+
+    it('should have correct aria-label for retry down vote', () => {
+      render(<VotingButton {...defaultProps} type="down" hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('aria-label', 'Retry vote down');
+    });
+
+    it('should display retry icon with spin animation when hasError is true', () => {
+      render(<VotingButton {...defaultProps} hasError={true} />);
+      
+      const button = screen.getByRole('button');
+      const icon = button.querySelector('svg');
+      expect(icon).toBeInTheDocument();
+      expect(icon).toHaveClass('animate-spin');
+    });
+
+    it('should prioritize error styles over current vote styles', () => {
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          isCurrentVote={true} 
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass('bg-red-100', 'text-red-700', 'border-red-300');
+      expect(button).not.toHaveClass('bg-green-100', 'text-green-700');
+    });
+  });
+
+  describe('Retry Functionality', () => {
+    it('should call onRetry when button is clicked in error state', () => {
+      const mockOnRetry = vi.fn();
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          onRetry={mockOnRetry}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+      
+      expect(mockOnRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onRetry instead of onClick when hasError is true', () => {
+      const mockOnClick = vi.fn();
+      const mockOnRetry = vi.fn();
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          onClick={mockOnClick}
+          onRetry={mockOnRetry}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+      
+      expect(mockOnRetry).toHaveBeenCalledTimes(1);
+      expect(mockOnClick).not.toHaveBeenCalled();
+    });
+
+    it('should not call onRetry when hasError is false', () => {
+      const mockOnRetry = vi.fn();
+      const mockOnClick = vi.fn();
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={false} 
+          onClick={mockOnClick}
+          onRetry={mockOnRetry}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+      
+      expect(mockOnClick).toHaveBeenCalledTimes(1);
+      expect(mockOnRetry).not.toHaveBeenCalled();
+    });
+
+    it('should handle retry when onRetry is not provided', () => {
+      // Should not throw error even if onRetry is undefined
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          onRetry={undefined}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      expect(() => fireEvent.click(button)).not.toThrow();
+    });
+  });
+
+  describe('Error State Combinations', () => {
+    it('should handle error state with isVoted true', () => {
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          isVoted={true}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      expect(button).toBeEnabled();
+      expect(button).toHaveTextContent('Retry');
+      expect(button).toHaveClass('bg-red-100', 'text-red-700');
+    });
+
+    it('should handle error state with disabled true', () => {
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          hasError={true} 
+          disabled={true}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      expect(button).toBeDisabled();
+      expect(button).toHaveClass('bg-red-100', 'text-red-700');
+    });
+
+    it('should show normal vote behavior when no error', () => {
+      render(
+        <VotingButton 
+          {...defaultProps} 
+          type="up"
+          hasError={false} 
+          isCurrentVote={true}
+        />
+      );
+      
+      const button = screen.getByRole('button');
+      expect(button).toHaveTextContent('Up');
+      expect(button).toHaveClass('bg-green-100', 'text-green-700');
+      expect(button).toHaveAttribute('aria-label', 'Vote up');
     });
   });
 });

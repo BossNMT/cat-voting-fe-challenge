@@ -101,10 +101,29 @@
     box-shadow: 0 8px 32px rgba(244, 63, 94, 0.3);
   }
 
+  .vote-status-error {
+    @apply bg-gradient-to-r from-orange-500/90 to-red-500/90 text-white;
+    box-shadow: 0 8px 32px rgba(249, 115, 22, 0.3);
+  }
+
+  .vote-button-retry {
+    @apply bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white;
+    box-shadow: 0 8px 32px rgba(249, 115, 22, 0.4), 0 4px 16px rgba(249, 115, 22, 0.2);
+  }
+
+  .vote-button-retry:hover {
+    box-shadow: 0 12px 40px rgba(249, 115, 22, 0.5), 0 6px 20px rgba(249, 115, 22, 0.3);
+    transform: translateY(-2px) scale(1.1);
+  }
+
   /* Mobile optimizations */
   @media (max-width: 768px) {
     .vote-button {
-      @apply px-4 py-2 text-xs;
+      @apply px-3 py-2 text-xs gap-1;
+    }
+    
+    .vote-button svg {
+      @apply w-4 h-4;
     }
     
     .voting-buttons {

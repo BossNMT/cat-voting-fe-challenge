@@ -1,9 +1,9 @@
 import React, { memo, useMemo } from 'react';
 import { HandThumbUpIcon, HandThumbDownIcon } from '@heroicons/react/24/solid';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import type { CatImage } from '../../../types/cat.types';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
-import { useCreateVote, useHasVoted } from '../../../queries/useVotes';
-import { useUIStore } from '../../../store/uiStore';
+import { useOptimisticVoting } from '../../../queries/useVotes';
 import { useLazyImage } from '../../../hooks/useLazyImage';
 import { useDebouncedCallback } from '../../../utils/performance';
 
@@ -12,9 +12,13 @@ interface MasonryCatImageCardProps {
 }
 
 export const MasonryCatImageCard: React.FC<MasonryCatImageCardProps> = memo(({ image }) => {
-  const { hasVoted, vote: userVote } = useHasVoted(image.id);
-  const createVoteMutation = useCreateVote();
-  const { isVoting, setVoting } = useUIStore();
+  const {
+    vote,
+    retry,
+    hasVoted,
+    userVote,
+    isError,
+  } = useOptimisticVoting(image.id);
   
   const {
     imgRef,
@@ -24,8 +28,6 @@ export const MasonryCatImageCard: React.FC<MasonryCatImageCardProps> = memo(({ i
     handleLoad,
     handleError,
   } = useLazyImage(image.url);
-  
-  const isCurrentlyVoting = isVoting[image.id] || createVoteMutation.isPending;
   
   // Calculate aspect ratio for natural image display
   const aspectRatio = useMemo(() => {
@@ -37,17 +39,13 @@ export const MasonryCatImageCard: React.FC<MasonryCatImageCardProps> = memo(({ i
 
   // Debounce voting to prevent accidental double-clicks
   const debouncedVote = useDebouncedCallback(async (value: 1 | -1) => {
-    if (hasVoted || isCurrentlyVoting) return;
-    
-    setVoting(image.id, true);
+    if (hasVoted && !isError) return;
     
     try {
-      await createVoteMutation.mutateAsync({
-        image_id: image.id,
-        value,
-      });
-    } finally {
-      setVoting(image.id, false);
+      await vote(value);
+    } catch (error) {
+      // Error handling is done by the optimistic voting hook
+      console.error('Vote failed:', error);
     }
   }, 300);
 
@@ -96,51 +94,62 @@ export const MasonryCatImageCard: React.FC<MasonryCatImageCardProps> = memo(({ i
           />
         )}
 
-        {/* Vote Status Badge */}
-        {voteStatus && (
+        {/* Vote Status Badge - Show only when voted and no error */}
+        {voteStatus && !isError && (
           <div className={`vote-status ${voteStatus.isUpvote ? 'vote-status-up' : 'vote-status-down'}`}>
             {voteStatus.icon} {voteStatus.text}
           </div>
         )}
 
-        {/* Voting Overlay - Only show on hover and when not voted */}
-        {!hasVoted && !isCurrentlyVoting && (
-          <div className="voting-overlay">
-            <div className="voting-buttons">
-              <button
-                className="vote-button vote-button-up group"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  debouncedVote(1);
-                }}
-                disabled={isCurrentlyVoting}
-                aria-label="Vote up"
-              >
-                <HandThumbUpIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" />
-                <span className="font-bold">Up</span>
-              </button>
-              <button
-                className="vote-button vote-button-down group"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  debouncedVote(-1);
-                }}
-                disabled={isCurrentlyVoting}
-                aria-label="Vote down"
-              >
-                <HandThumbDownIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" />
-                <span className="font-bold">Down</span>
-              </button>
-            </div>
+        {/* Error Status Badge */}
+        {isError && (
+          <div className="vote-status vote-status-error">
+            ⚠️ Failed
           </div>
         )}
 
-        {/* Loading State for Voting */}
-        {isCurrentlyVoting && (
-          <div className="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center">
-            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl px-6 py-4 flex items-center shadow-2xl border border-white/20">
-              <LoadingSpinner size="sm" />
-              <span className="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Voting...</span>
+        {/* Voting Overlay - Show on hover when not voted OR when there's an error */}
+        {(!hasVoted || isError) && (
+          <div className="voting-overlay">
+            <div className="voting-buttons">
+              {isError ? (
+                <button
+                  className="vote-button vote-button-retry group"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    retry();
+                  }}
+                  aria-label="Retry vote"
+                >
+                  <ArrowPathIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="font-bold">Retry</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="vote-button vote-button-up group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      debouncedVote(1);
+                    }}
+                    aria-label="Vote up"
+                  >
+                    <HandThumbUpIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="font-bold">Up</span>
+                  </button>
+                  <button
+                    className="vote-button vote-button-down group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      debouncedVote(-1);
+                    }}
+                    aria-label="Vote down"
+                  >
+                    <HandThumbDownIcon className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="font-bold">Down</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
